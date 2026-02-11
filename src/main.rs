@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod errors;
 mod formatter;
 mod package_managers;
 mod report_handler;
@@ -13,7 +14,10 @@ use tracing::level_filters::LevelFilter;
 use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::{Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{commands::install, report_handler::ErrorReportHandler};
+use crate::{
+    commands::{apply, lint},
+    report_handler::ErrorReportHandler,
+};
 
 /// DotGet
 ///
@@ -30,16 +34,19 @@ struct Cli {
 
 #[derive(Parser, Debug, Clone)]
 pub struct GlobalArgs {
-    #[arg(short = 'f', long, default_value_os = OsStr::new("dotget.yaml"))]
+    #[arg(short = 'f', long, global = true, default_value_os = OsStr::new("dotget.yaml"))]
     file: PathBuf,
 }
 
 #[derive(Subcommand, Debug, Clone)]
 enum Commands {
-    Install {
+    /// Apply the configuration file to this system
+    Apply {
         #[command(flatten)]
-        args: install::InstallArgs,
+        args: apply::ApplyArgs,
     },
+    /// Find potential issues with the configuration file
+    Lint,
 }
 
 #[tokio::main]
@@ -60,7 +67,8 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Install { args } => install::install(cli.args, args),
+        Commands::Apply { args } => apply::apply(cli.args, args).await,
+        Commands::Lint => lint::lint(cli.args).await,
     };
 
     if let Err(e) = result {

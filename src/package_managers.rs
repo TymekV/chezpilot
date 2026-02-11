@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 
+use crate::config::OsName;
+
 #[async_trait]
 pub trait PackageManager {
+    const SUPPORTED_OS: &'static [OsName];
     async fn install(packages: Vec<String>);
 }
 
@@ -27,6 +30,7 @@ struct Brew;
 
 #[async_trait]
 impl PackageManager for Brew {
+    const SUPPORTED_OS: &'static [OsName] = &[OsName::MacOS, OsName::Linux];
     async fn install(packages: Vec<String>) {}
 }
 

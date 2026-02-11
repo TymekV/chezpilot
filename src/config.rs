@@ -1,14 +1,26 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
+use miette::Result;
 use schemars::JsonSchema;
 use serde::Deserialize;
+use tokio::fs;
 
-use crate::package_managers::PackageManagerName;
+use crate::{
+    errors::{InvalidConfig, UnableToReadConfig},
+    package_managers::PackageManagerName,
+};
 
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
 pub struct Config {
     pub conditions: HashMap<String, Condition>,
     pub groups: Vec<Group>,
+}
+
+#[derive(Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OsName {
+    Windows,
+    MacOS,
+    Linux,
 }
 
 /// Operating system type constraint.
@@ -38,8 +50,7 @@ pub enum OsType {
         /// - `"fedora"`
         ///
         /// If multiple values are provided, they are treated as a logical OR.
-        #[serde(default)]
-        distro: Vec<String>,
+        distro: Option<Vec<String>>,
 
         /// Distribution family identifiers matched against the
         /// `ID_LIKE` field in `/etc/os-release`.
@@ -49,9 +60,18 @@ pub enum OsType {
         /// - `"rhel"` (matches Fedora, Rocky, AlmaLinux, etc.)
         ///
         /// If multiple values are provided, they are treated as a logical OR.
-        #[serde(default)]
-        distro_like: Vec<String>,
+        distro_like: Option<Vec<String>>,
     },
+}
+
+impl OsType {
+    fn name(&self) -> OsName {
+        match self {
+            OsType::Windows => OsName::Windows,
+            OsType::MacOS { .. } => OsName::MacOS,
+            OsType::Linux { .. } => OsName::Linux,
+        }
+    }
 }
 
 /// Execution condition used to determine whether something
@@ -88,6 +108,14 @@ pub struct Condition {
 pub struct Group {
     pub conditions: Vec<String>,
     pub packages: HashMap<PackageManagerName, Vec<String>>,
+}
+
+pub async fn read_config(path: &Path) -> Result<Config> {
+    let config = fs::read_to_string(path)
+        .await
+        .map_err(|_| UnableToReadConfig { path: path.into() })?;
+    let config = serde_yaml::from_str::<Config>(&config).map_err(InvalidConfig)?;
+    Ok(config)
 }
 
 #[cfg(test)]
