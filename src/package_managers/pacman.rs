@@ -47,7 +47,30 @@ impl PackageManager for Pacman {
 
     #[cfg(target_os = "linux")]
     async fn install(&self, packages: Vec<String>) -> Result<()> {
-        dbg!("install", &packages);
+        use miette::Context;
+        use tokio::process::Command;
+
+        if packages.is_empty() {
+            return Ok(());
+        }
+
+        let status = Command::new("sudo")
+            .arg("pacman")
+            .arg("-S")
+            .arg("--needed") // Skip packages that are already up to date
+            .args(&packages)
+            .stdin(std::process::Stdio::inherit())
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit())
+            .status()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to execute pacman")?;
+
+        if !status.success() {
+            miette::bail!("pacman exited with status: {}", status);
+        }
+
         Ok(())
     }
 }
