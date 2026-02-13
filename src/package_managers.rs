@@ -5,28 +5,47 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use miette::Result;
 use owo_colors::OwoColorize;
+use schemars::JsonSchema;
+use serde::Deserialize;
 use tracing::info;
 
 use crate::{config::OsName, errors::UnsupportedPlatform};
-
-#[derive(Clone)]
-pub struct PackageMetadata {
-    pub version: Option<String>,
-}
 
 #[async_trait]
 pub trait PackageManager {
     const NAME: &'static str;
     const SUPPORTED_OS: &'static [OsName];
 
-    async fn get_installed(&self) -> Result<HashMap<String, PackageMetadata>> {
+    type Options: for<'de> Deserialize<'de> + JsonSchema + Send + Sync + Clone;
+    type Package: for<'de> Deserialize<'de> + JsonSchema + Send + Sync + Clone;
+
+    async fn get_installed(&self) -> Result<HashMap<String, Self::Package>> {
         let error = UnsupportedPlatform {
             manager: Self::NAME,
         };
         Err(error.into())
     }
 
-    async fn install(&self, _packages: Vec<String>) -> Result<()> {
+    fn filter_missing(
+        &self,
+        installed: HashMap<String, Self::Package>,
+        desired: &Self::Options,
+    ) -> Result<Vec<Self::Package>> {
+        let error = UnsupportedPlatform {
+            manager: Self::NAME,
+        };
+        Err(error.into())
+    }
+
+    async fn install_missing(&self, config: Self::Options) -> Result<()> {
+        let installed = self.get_installed().await?;
+
+        let missing = self.filter_missing(installed, &config)?;
+        info!("Found {} missing packages", missing.len().cyan().bold());
+        Ok(())
+    }
+
+    async fn install(&self, _options: Self::Options) -> Result<()> {
         let error = UnsupportedPlatform {
             manager: Self::NAME,
         };
@@ -40,6 +59,12 @@ macro_rules! package_managers {
         #[serde(rename_all = "lowercase")]
         pub enum PackageManagerName {
             $($name),*
+        }
+
+        #[derive(serde::Deserialize, schemars::JsonSchema, Debug, Clone)]
+        #[serde(rename_all = "lowercase")]
+        pub enum PackageManagerConfig {
+            $($name(<$struct as PackageManager>::Options)),*
         }
 
         paste::paste! {
@@ -61,18 +86,18 @@ macro_rules! package_managers {
                 }
 
 
-                pub async fn get_installed(&self, manager: PackageManagerName) -> Result<HashMap<String, PackageMetadata>> {
-                    match manager {
+                pub async fn install_missing(&self, config: PackageManagerConfig) -> Result<()> {
+                    match config {
                         $(
-                            PackageManagerName::$name => <$struct as PackageManager>::get_installed(&self.[< $name:lower >]).await
+                            PackageManagerConfig::$name(options) => <$struct as PackageManager>::install_missing(&self.[< $name:lower >], options).await
                         ),*
                     }
                 }
 
-                pub async fn install(&self, manager: PackageManagerName, packages: Vec<String>) -> Result<()> {
-                    match manager {
+                pub async fn install(&self, config: PackageManagerConfig) -> Result<()> {
+                    match config {
                         $(
-                            PackageManagerName::$name => <$struct as PackageManager>::install(&self.[< $name:lower >], packages).await
+                            PackageManagerConfig::$name(options) => <$struct as PackageManager>::install(&self.[< $name:lower >], options).await
                         ),*
                     }
                 }
@@ -84,24 +109,3 @@ macro_rules! package_managers {
 package_managers!(
     Pacman => pacman::Pacman,
 );
-
-impl PackageManagers {
-    pub async fn install_missing(
-        &self,
-        manager: PackageManagerName,
-        packages: Vec<String>,
-    ) -> Result<()> {
-        let installed = self.get_installed(manager).await?;
-
-        let missing = packages
-            .into_iter()
-            .filter(|package| !installed.contains_key(package))
-            .collect::<Vec<_>>();
-
-        info!("Found {} missing packages", missing.len().cyan().bold());
-
-        self.install(manager, missing).await?;
-
-        Ok(())
-    }
-}

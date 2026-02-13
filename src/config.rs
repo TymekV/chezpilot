@@ -8,7 +8,7 @@ use tokio::fs;
 
 use crate::{
     errors::{InvalidConfig, UnableToReadConfig},
-    package_managers::PackageManagerName,
+    package_managers::{PackageManagerConfig, PackageManagerName},
 };
 
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
@@ -109,7 +109,7 @@ pub struct Condition {
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
 pub struct Group {
     pub conditions: Vec<String>,
-    pub packages: HashMap<PackageManagerName, Vec<String>>,
+    pub packages: Vec<PackageManagerConfig>,
 }
 
 pub async fn read_config(path: &Path) -> Result<Config> {

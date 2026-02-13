@@ -79,11 +79,11 @@ where
             },
         };
 
-        if in_scope(ctx, "aginci_cli::nested") {
+        if in_scope(ctx, "dotget::nested") {
             write!(writer, "  ")?;
         }
 
-        if in_scope(ctx, "aginci_cli::nested::nested") {
+        if in_scope(ctx, "dotget::nested::nested") {
             write!(writer, "  ")?;
         }
 

@@ -1,15 +1,11 @@
-use std::collections::HashMap;
-
-use async_trait::async_trait;
-use miette::{IntoDiagnostic, Result};
-
 #[cfg(target_os = "linux")]
 use alpm::Alpm;
+use async_trait::async_trait;
+use miette::{IntoDiagnostic, Result};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
-use crate::{
-    config::OsName,
-    package_managers::{PackageManager, PackageMetadata},
-};
+use crate::{config::OsName, package_managers::PackageManager};
 
 pub struct Pacman {}
 
@@ -19,10 +15,37 @@ impl Pacman {
     }
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct PacmanPackage {
+    pub name: String,
+    pub version: String,
+    pub aur: bool,
+}
+
+#[derive(Deserialize, Debug, Clone, JsonSchema)]
+pub struct PacmanOptions {
+    /// Packages installed using `pacman`
+    pub repo: Option<Vec<String>>,
+
+    /// Additional arguments passed to `pacman`
+    pub pacman_args: Option<Vec<String>>,
+
+    /// Packages installed using user's preferred AUR helper by default.
+    pub aur: Option<Vec<String>>,
+
+    /// Args passed to user's AUR helper.
+    pub aur_helper_args: Option<Vec<String>>,
+
+    /// Force the usage of a specified AUR helper.
+    pub force_aur_helper: Option<String>,
+}
+
 #[async_trait]
 impl PackageManager for Pacman {
     const NAME: &'static str = "pacman";
     const SUPPORTED_OS: &'static [OsName] = &[OsName::Linux];
+
+    type Options = PacmanOptions;
 
     #[cfg(target_os = "linux")]
     async fn get_installed(&self) -> Result<HashMap<String, PackageMetadata>> {
@@ -46,7 +69,7 @@ impl PackageManager for Pacman {
     }
 
     #[cfg(target_os = "linux")]
-    async fn install(&self, packages: Vec<String>) -> Result<()> {
+    async fn install(&self, options: Self::Options) -> Result<()> {
         use miette::Context;
         use tokio::process::Command;
 
