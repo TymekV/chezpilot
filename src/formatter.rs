@@ -1,6 +1,9 @@
 use owo_colors::OwoColorize;
-use std::fmt;
-use tracing::{Event, Level, Subscriber};
+use std::fmt::{self, Write};
+use tracing::{
+    Event, Level, Subscriber,
+    field::{Field, Visit},
+};
 use tracing_subscriber::{
     fmt::{
         FmtContext,
@@ -88,7 +91,35 @@ where
         }
 
         write!(writer, "{prefix} ")?;
-        ctx.field_format().format_fields(writer.by_ref(), event)?;
+        // ctx.field_format().format_fields(writer.by_ref(), event)?;
+
+        let mut visitor = StringVisitor {
+            string: &mut String::new(),
+        };
+        event.record(&mut visitor);
+        write!(writer, "{}", visitor.string)?;
+
         writeln!(writer)
+    }
+}
+
+pub struct StringVisitor<'a> {
+    string: &'a mut String,
+}
+
+impl<'a> Visit for StringVisitor<'a> {
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        if field.name() == "message" {
+            write!(self.string, "{:?}", value).unwrap();
+        } else {
+            write!(
+                self.string,
+                " {}{}{:?}",
+                field.name().dimmed().italic(),
+                "=".dimmed(),
+                value
+            )
+            .unwrap();
+        }
     }
 }

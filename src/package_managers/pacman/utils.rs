@@ -3,10 +3,7 @@ use thiserror::Error;
 use tokio::process::Command;
 use tracing::{info, instrument};
 
-use crate::{
-    errors::{AurHelperNotDetected, AurHelperPinReason, RequestedAurHelperNotFound},
-    package_managers::pacman::PacmanOptions,
-};
+use crate::errors::{AurHelperNotDetected, AurHelperPinReason, RequestedAurHelperNotFound};
 
 static AUR_HELPERS: &[&str] = &["paru", "yay", "pikaur", "trizen"];
 

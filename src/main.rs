@@ -54,16 +54,15 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     miette::set_hook(Box::new(|_| Box::new(ErrorReportHandler::new())))?;
-    let indicatif_layer = IndicatifLayer::new();
 
     tracing_subscriber::registry()
         .with(
             fmt::layer()
-                .with_writer(indicatif_layer.get_stderr_writer())
+                // .with_writer(indicatif_layer.get_stderr_writer())
                 .event_format(formatter::EventFormatter)
                 .with_filter(LevelFilter::INFO),
         )
-        .with(indicatif_layer)
+        // .with(indicatif_layer)
         .init();
 
     let managers = PackageManagers::new()?;

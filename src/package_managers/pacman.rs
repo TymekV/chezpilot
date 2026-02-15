@@ -62,7 +62,7 @@ impl PackageManager for Pacman {
             .pkgs()
             .iter()
             .map(|package| {
-                dbg!(&package.origin());
+                // dbg!(&package.origin());
                 (
                     package.name().to_string(),
                     PacmanPackage {
@@ -77,6 +77,36 @@ impl PackageManager for Pacman {
         Ok(packages)
     }
 
+    fn filter_missing(
+        &self,
+        installed: HashMap<String, Self::Package>,
+        desired: &Self::Options,
+    ) -> Result<(Self::Options, usize)> {
+        let repo = desired.repo.clone().map(|r| {
+            r.into_iter()
+                .filter(|p| installed.get(p).is_some_and(|package| !package.aur))
+                .collect::<Vec<_>>()
+        });
+
+        let aur = desired.aur.clone().map(|r| {
+            r.into_iter()
+                .filter(|p| installed.get(p).is_some_and(|package| package.aur))
+                .collect::<Vec<_>>()
+        });
+
+        let missing_count =
+            repo.as_ref().map_or(0, |r| r.len()) + aur.as_ref().map_or(0, |a| a.len());
+
+        Ok((
+            Self::Options {
+                repo,
+                aur,
+                ..desired.clone()
+            },
+            missing_count,
+        ))
+    }
+
     #[cfg(target_os = "linux")]
     async fn install(&self, options: Self::Options) -> Result<()> {
         use crate::package_managers::pacman::utils::select_aur_helper;
@@ -86,15 +116,17 @@ impl PackageManager for Pacman {
         if let Some(repo_packages) = &options.repo
             && repo_packages.is_empty()
         {
+            use std::process::Stdio;
+
             let status = Command::new("sudo")
                 .arg("pacman")
                 .arg("-S")
                 .arg("--needed") // Skip packages that are already up to date
                 .args(options.pacman_args.unwrap_or_default())
                 .args(repo_packages)
-                .stdin(std::process::Stdio::inherit())
-                .stdout(std::process::Stdio::inherit())
-                .stderr(std::process::Stdio::inherit())
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
                 .status()
                 .await
                 .into_diagnostic()

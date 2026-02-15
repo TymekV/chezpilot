@@ -28,9 +28,9 @@ pub trait PackageManager {
 
     fn filter_missing(
         &self,
-        installed: HashMap<String, Self::Package>,
-        desired: &Self::Options,
-    ) -> Result<Vec<Self::Package>> {
+        _installed: HashMap<String, Self::Package>,
+        _desired: &Self::Options,
+    ) -> Result<(Self::Options, usize)> {
         let error = UnsupportedPlatform {
             manager: Self::NAME,
         };
@@ -40,8 +40,11 @@ pub trait PackageManager {
     async fn install_missing(&self, config: Self::Options) -> Result<()> {
         let installed = self.get_installed().await?;
 
-        let missing = self.filter_missing(installed, &config)?;
-        info!("Found {} missing packages", missing.len().cyan().bold());
+        let (missing, count) = self.filter_missing(installed, &config)?;
+        info!("Found {} missing packages", count.cyan().bold());
+
+        self.install(missing).await?;
+
         Ok(())
     }
 
@@ -90,14 +93,6 @@ macro_rules! package_managers {
                     match config {
                         $(
                             PackageManagerConfig::$name(options) => <$struct as PackageManager>::install_missing(&self.[< $name:lower >], options).await
-                        ),*
-                    }
-                }
-
-                pub async fn install(&self, config: PackageManagerConfig) -> Result<()> {
-                    match config {
-                        $(
-                            PackageManagerConfig::$name(options) => <$struct as PackageManager>::install(&self.[< $name:lower >], options).await
                         ),*
                     }
                 }
