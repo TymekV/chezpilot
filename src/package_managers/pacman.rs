@@ -1,9 +1,14 @@
 #[cfg(target_os = "linux")]
+mod utils;
+
+#[cfg(target_os = "linux")]
 use alpm::Alpm;
 use async_trait::async_trait;
 use miette::{IntoDiagnostic, Result};
 use schemars::JsonSchema;
 use serde::Deserialize;
+
+use std::collections::HashMap;
 
 use crate::{config::OsName, package_managers::PackageManager};
 
@@ -15,7 +20,7 @@ impl Pacman {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, JsonSchema)]
 pub struct PacmanPackage {
     pub name: String,
     pub version: String,
@@ -46,9 +51,10 @@ impl PackageManager for Pacman {
     const SUPPORTED_OS: &'static [OsName] = &[OsName::Linux];
 
     type Options = PacmanOptions;
+    type Package = PacmanPackage;
 
     #[cfg(target_os = "linux")]
-    async fn get_installed(&self) -> Result<HashMap<String, PackageMetadata>> {
+    async fn get_installed(&self) -> Result<HashMap<String, Self::Package>> {
         let alpm = Alpm::new("/", "/var/lib/pacman").into_diagnostic()?;
         let db = alpm.localdb();
 
@@ -56,10 +62,13 @@ impl PackageManager for Pacman {
             .pkgs()
             .iter()
             .map(|package| {
+                dbg!(&package.origin());
                 (
                     package.name().to_string(),
-                    PackageMetadata {
-                        version: Some(package.version().to_string()),
+                    PacmanPackage {
+                        name: package.name().to_string(),
+                        version: package.version().to_string(),
+                        aur: false, // TODO
                     },
                 )
             })
@@ -70,28 +79,55 @@ impl PackageManager for Pacman {
 
     #[cfg(target_os = "linux")]
     async fn install(&self, options: Self::Options) -> Result<()> {
+        use crate::package_managers::pacman::utils::select_aur_helper;
         use miette::Context;
         use tokio::process::Command;
 
-        if packages.is_empty() {
-            return Ok(());
+        if let Some(repo_packages) = &options.repo
+            && repo_packages.is_empty()
+        {
+            let status = Command::new("sudo")
+                .arg("pacman")
+                .arg("-S")
+                .arg("--needed") // Skip packages that are already up to date
+                .args(options.pacman_args.unwrap_or_default())
+                .args(repo_packages)
+                .stdin(std::process::Stdio::inherit())
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .status()
+                .await
+                .into_diagnostic()
+                .wrap_err("Failed to execute pacman")?;
+
+            if !status.success() {
+                miette::bail!("pacman exited with status: {}", status);
+            }
         }
 
-        let status = Command::new("sudo")
-            .arg("pacman")
-            .arg("-S")
-            .arg("--needed") // Skip packages that are already up to date
-            .args(&packages)
-            .stdin(std::process::Stdio::inherit())
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            .status()
-            .await
-            .into_diagnostic()
-            .wrap_err("Failed to execute pacman")?;
+        if let Some(aur_packages) = &options.aur
+            && aur_packages.is_empty()
+        {
+            let helper = select_aur_helper(options.force_aur_helper.clone())
+                .await
+                .into_diagnostic()?;
 
-        if !status.success() {
-            miette::bail!("pacman exited with status: {}", status);
+            let status = Command::new(&helper)
+                .arg("-S")
+                .arg("--needed")
+                .args(options.aur_helper_args.unwrap_or_default())
+                .args(aur_packages)
+                .stdin(std::process::Stdio::inherit())
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .status()
+                .await
+                .into_diagnostic()
+                .wrap_err("Failed to execute {helper}")?;
+
+            if !status.success() {
+                miette::bail!("{helper} exited with status: {}", status);
+            }
         }
 
         Ok(())

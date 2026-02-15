@@ -33,8 +33,8 @@ pub async fn apply(
     });
 
     for group in matching_groups {
-        for (manager, packages) in group.packages {
-            managers.install_missing(manager, packages).await?;
+        for batch in group.packages {
+            managers.install_missing(batch).await?;
         }
     }
 

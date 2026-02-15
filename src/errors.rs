@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use miette::Diagnostic;
+use strum::Display;
 use thiserror::Error;
 
 #[derive(Error, Debug, Diagnostic)]
@@ -30,4 +31,35 @@ pub struct InvalidConfig(pub serde_yaml::Error);
 )]
 pub struct UnsupportedPlatform {
     pub manager: &'static str,
+}
+
+#[derive(Error, Debug, Diagnostic)]
+#[error("no AUR helper found")]
+#[diagnostic(
+    code(package::aur::helper_not_detected),
+    help(
+        "Install a popular AUR helper (e.g. paru or yay) or set the AUR_HELPER environment variable to point to your preferred one."
+    )
+)]
+pub struct AurHelperNotDetected;
+
+#[derive(Debug, Display)]
+pub enum AurHelperPinReason {
+    #[strum(serialize = "a config override")]
+    ConfigOverride,
+    #[strum(serialize = "an env override (AUR_HELPER)")]
+    EnvOverride,
+    #[strum(serialize = "other means")]
+    Other,
+}
+
+#[derive(Error, Debug, Diagnostic)]
+#[error("{helper}: command not found")]
+#[diagnostic(
+    code(package::aur::requested_helper_not_found),
+    help("This heleper was specified by {reason}, but could not be found on your system.")
+)]
+pub struct RequestedAurHelperNotFound {
+    pub helper: String,
+    pub reason: AurHelperPinReason,
 }

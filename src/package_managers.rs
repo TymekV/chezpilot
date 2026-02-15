@@ -62,7 +62,7 @@ macro_rules! package_managers {
         }
 
         #[derive(serde::Deserialize, schemars::JsonSchema, Debug, Clone)]
-        #[serde(rename_all = "lowercase")]
+        #[serde(tag = "manager", content = "install", rename_all = "lowercase")]
         pub enum PackageManagerConfig {
             $($name(<$struct as PackageManager>::Options)),*
         }

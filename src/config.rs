@@ -8,7 +8,7 @@ use tokio::fs;
 
 use crate::{
     errors::{InvalidConfig, UnableToReadConfig},
-    package_managers::{PackageManagerConfig, PackageManagerName},
+    package_managers::PackageManagerConfig,
 };
 
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
