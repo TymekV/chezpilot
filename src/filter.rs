@@ -1,10 +1,13 @@
-use std::{env::consts::OS, str::FromStr};
+use std::{alloc::GlobalAlloc, env::consts::OS, str::FromStr};
 
 use miette::{IntoDiagnostic, Result};
 use semver::Version;
 use sysinfo::{RefreshKind, System};
 
-use crate::config::{Condition, OsName, OsType};
+use crate::{
+    GlobalArgs,
+    config::{Condition, OsName, OsType},
+};
 
 pub struct SystemInfo {
     pub os: OsName,
@@ -29,7 +32,16 @@ pub fn get_system_info() -> Result<SystemInfo> {
     })
 }
 
-pub fn check_condition(system: &SystemInfo, condition: &Condition) -> bool {
+pub fn check_condition(
+    system: &SystemInfo,
+    condition: &Condition,
+    global_args: &GlobalArgs,
+) -> bool {
+    // Check label
+    if let Some(label) = &condition.label {
+        return global_args.labels.contains(label);
+    }
+
     // Check OS conditions
     if let Some(condition_os_list) = &condition.os {
         let os_matches = condition_os_list.iter().any(|os| {

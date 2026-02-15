@@ -38,7 +38,7 @@ pub async fn apply(
             .conditions
             .iter()
             .filter_map(|condition_name| config.conditions.get(condition_name))
-            .all(|c| check_condition(&system, c))
+            .all(|c| check_condition(&system, c, &global_args))
     });
 
     for group in matching_groups {

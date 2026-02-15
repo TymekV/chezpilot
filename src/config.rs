@@ -83,6 +83,12 @@ impl OsType {
 /// If a field is left empty, it does not restrict matching.
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
 pub struct Condition {
+    pub name: Option<String>,
+
+    /// Custom label passed to `apply`.
+    /// If set, must be passed to activate this condition.
+    pub label: Option<String>,
+
     /// Operating system constraints.
     /// Works like a logical OR.
     pub os: Option<Vec<OsType>>,

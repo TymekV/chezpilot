@@ -12,7 +12,6 @@ use std::{ffi::OsStr, path::PathBuf, process};
 use clap::{Parser, Subcommand};
 use miette::Result;
 use tracing::level_filters::LevelFilter;
-use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::{Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
@@ -38,6 +37,9 @@ struct Cli {
 pub struct GlobalArgs {
     #[arg(short = 'f', long, global = true, default_value_os = OsStr::new("dotget.yaml"))]
     file: PathBuf,
+
+    #[arg(short = 'l', long, global = true)]
+    labels: Vec<String>,
 }
 
 #[derive(Subcommand, Debug, Clone)]
