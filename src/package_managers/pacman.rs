@@ -24,7 +24,6 @@ impl Pacman {
 pub struct PacmanPackage {
     pub name: String,
     pub version: String,
-    pub aur: bool,
 }
 
 #[derive(Deserialize, Debug, Clone, JsonSchema)]
@@ -68,7 +67,6 @@ impl PackageManager for Pacman {
                     PacmanPackage {
                         name: package.name().to_string(),
                         version: package.version().to_string(),
-                        aur: false, // TODO
                     },
                 )
             })
@@ -84,13 +82,13 @@ impl PackageManager for Pacman {
     ) -> Result<(Self::Options, usize)> {
         let repo = desired.repo.clone().map(|r| {
             r.into_iter()
-                .filter(|p| !installed.get(p).is_some_and(|package| !package.aur))
+                .filter(|p| !installed.contains_key(p))
                 .collect::<Vec<_>>()
         });
 
         let aur = desired.aur.clone().map(|r| {
             r.into_iter()
-                .filter(|p| !installed.get(p).is_some_and(|package| package.aur))
+                .filter(|p| !installed.contains_key(p))
                 .collect::<Vec<_>>()
         });
 
